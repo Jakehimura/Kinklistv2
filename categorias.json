@@ -1,0 +1,26 @@
+{
+  "categorias": [
+    { "id": "penetracao-basica", "nome": "Penetração Básica", "ordem": 1 },
+    { "id": "beijos-caricias", "nome": "Beijos, Carícias e Provocações", "ordem": 2 },
+    { "id": "brinquedos", "nome": "Brinquedos", "ordem": 3 },
+    { "id": "fluidos-corporais", "nome": "Fluidos Corporais", "ordem": 4 },
+    { "id": "menage-grupal", "nome": "Menage / Grupal", "ordem": 5 },
+    { "id": "bondage-restricao-geral", "nome": "Bondage - Restrição Geral", "ordem": 6 },
+    { "id": "shibari", "nome": "Amarrações com Cordas (Shibari)", "ordem": 7 },
+    { "id": "privacao-sentidos", "nome": "Privação de Sentidos", "ordem": 8 },
+    { "id": "equip-couro", "nome": "Equipamentos de Couro", "ordem": 9 },
+    { "id": "equip-metalicos", "nome": "Equipamentos Metálicos e Rígidos", "ordem": 10 },
+    { "id": "cordas-materiais", "nome": "Cordas e Materiais Flexíveis", "ordem": 11 },
+    { "id": "gags", "nome": "Gags", "ordem": 12 },
+    { "id": "spanking", "nome": "Spanking", "ordem": 13 },
+    { "id": "sadismo-masoquismo", "nome": "Sadismo e Masoquismo", "ordem": 14 },
+    { "id": "edge-play", "nome": "Edge Play", "ordem": 15 },
+    { "id": "dominacao-submissao", "nome": "Dominação e Submissão", "ordem": 16 },
+    { "id": "cbt-vbt", "nome": "CBT/VBT", "ordem": 17 },
+    { "id": "disciplina", "nome": "Disciplina", "ordem": 18 },
+    { "id": "mobilia-humana", "nome": "Mobília Humana", "ordem": 19 },
+    { "id": "medical-play", "nome": "Medical Play", "ordem": 20 },
+    { "id": "fetiches", "nome": "Fetiches", "ordem": 21 },
+    { "id": "roleplay", "nome": "Roleplay", "ordem": 22 }
+  ]
+}
