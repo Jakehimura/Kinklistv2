@@ -2,22 +2,23 @@
  * resultado-tools.js
  * -------------------
  * Funcionalidades da tela de resultados:
- * 1. Codificar/decodificar o resultado dentro de um link (sem backend), de forma compacta.
- * 2. Comparar dois perfis (o atual + um colado via link) e calcular compatibilidade,
- *    geral e por categoria.
+ * 1. Salvar o resultado no Firestore e gerar links curtos e estáveis (ID do
+ *    documento), tanto pra visualização quanto pra comparação automática.
+ * 2. Comparar dois perfis (o atual + um buscado via link) e calcular
+ *    compatibilidade, geral e por categoria.
  * 3. Exportar a tela de resultados como PDF.
  * 4. Salvar/retomar progresso automaticamente no localStorage.
  * 5. Gráfico de teia (radar) por categoria.
  *
- * PARA MANTER O LINK CURTO:
+ * SOBRE O FORMATO COMPACTO SALVO NO FIRESTORE:
  * - O pacote NÃO carrega texto de pergunta nem nome de categoria — só ids curtos
  *   (ex: "bondage-restricao-geral" + índice da pergunta). Quem abre o link já tem
  *   os mesmos data/categorias.json e data/perguntas.json carregados, então o texto
  *   é resolvido localmente a partir do id.
  * - Cada resposta vira uma string curta ('L' = limite rígido, 'N' = nunca
  *   experimentei, '0'-'6' = posição na escala) em vez de um objeto.
- * - O JSON resultante é comprimido com LZString antes de entrar na URL.
- * - Por cima disso tudo, o link ainda é encurtado via is.gd.
+ * - As funções window.dbSalvarResultado / window.dbBuscarResultado vêm do
+ *   módulo Firebase carregado no index.html.
  */
 
 // ---------- CODIFICAÇÃO COMPACTA ----------
@@ -61,17 +62,6 @@ function montarPacoteResultado() {
   return { v: 2, perfil: respostasPerfil, r };
 }
 
-function codificarPacote(pacote) {
-  const json = JSON.stringify(pacote);
-  return LZString.compressToEncodedURIComponent(json);
-}
-
-function decodificarPacote(token) {
-  const json = LZString.decompressFromEncodedURIComponent(token);
-  if (!json) throw new Error('Token inválido ou corrompido');
-  return JSON.parse(json);
-}
-
 function expandirPacote(pacote) {
   const catMap = {};
   const respostas = {};
@@ -96,136 +86,103 @@ function expandirPacote(pacote) {
   return { perfil: pacote.perfil, categorias: Object.values(catMap), respostas };
 }
 
-// ---------- LINK DE COMPARTILHAMENTO ----------
+// ---------- LINK DE COMPARTILHAMENTO (via Firestore) ----------
+// O resultado inteiro é salvo como um documento no Firestore; o link carrega
+// só o ID do documento (curto, estável, sem depender de encurtador externo).
 
-function gerarLinkCompartilhamento() {
-  const token = codificarPacote(montarPacoteResultado());
-  return `${location.origin}${location.pathname}#ver=${token}`;
+let meuResultadoId = null; // cacheado por sessão, pra não salvar de novo a cada clique
+
+async function garantirResultadoSalvo() {
+  if (meuResultadoId) return meuResultadoId;
+  if (typeof window.dbSalvarResultado !== 'function') {
+    throw new Error('Conexão com o banco de dados não está disponível.');
+  }
+  const pacote = montarPacoteResultado();
+  meuResultadoId = await window.dbSalvarResultado(pacote);
+  return meuResultadoId;
 }
 
-// Adiciona um limite de tempo a uma Promise: se ela não resolver/rejeitar
-// dentro do prazo, rejeita sozinha. Evita que uma chamada travada (script que
-// nunca carrega nem dá erro, comum com bloqueadores de anúncio) prenda a
-// interface pra sempre.
-function comTimeout(promise, ms, mensagemErro) {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => setTimeout(() => reject(new Error(mensagemErro)), ms))
-  ]);
-}
-
-// Encurta a URL usando is.gd (gratuito, sem cadastro, feito pra ser chamado direto
-// do navegador — usamos JSONP pra não depender de CORS).
-function encurtarLinkBruto(urlLonga) {
-  return new Promise((resolve, reject) => {
-    const callbackName = 'isgdCallback_' + Date.now();
-    const script = document.createElement('script');
-
-    const limpar = () => {
-      delete window[callbackName];
-      script.remove();
-    };
-
-    window[callbackName] = (data) => {
-      limpar();
-      if (data && data.shorturl) resolve(data.shorturl);
-      else reject(new Error((data && data.errormessage) || 'Erro ao encurtar o link'));
-    };
-
-    script.onerror = () => {
-      limpar();
-      reject(new Error('Falha ao contatar o encurtador'));
-    };
-
-    script.src = `https://is.gd/create.php?format=json&callback=${callbackName}&url=${encodeURIComponent(urlLonga)}`;
-    document.body.appendChild(script);
-  });
-}
-
-function encurtarLink(urlLonga) {
-  return comTimeout(encurtarLinkBruto(urlLonga), 6000, 'Tempo esgotado ao tentar encurtar o link');
-}
-
-// Faz o caminho inverso: dado um link curto (is.gd/xxxxx ou v.gd/xxxxx), resolve
-// pra URL completa original. Necessário porque quem cola um link no comparador
-// normalmente vai colar a versão curta, não a longa com o token dentro.
-// Se o texto passado não parecer um link curto, devolve ele mesmo sem alterar.
-function resolverLinkCurtoBruto(urlOuTexto) {
-  return new Promise((resolve, reject) => {
-    const match = urlOuTexto.match(/(?:is\.gd|v\.gd)\/([a-zA-Z0-9]+)/);
-    if (!match) { resolve(urlOuTexto); return; }
-
-    const codigo = match[1];
-    const callbackName = 'isgdLookup_' + Date.now();
-    const script = document.createElement('script');
-
-    const limpar = () => {
-      delete window[callbackName];
-      script.remove();
-    };
-
-    window[callbackName] = (data) => {
-      limpar();
-      if (data && data.url) resolve(data.url);
-      else reject(new Error((data && data.errormessage) || 'Não consegui resolver o link curto'));
-    };
-
-    script.onerror = () => {
-      limpar();
-      reject(new Error('Falha ao contatar o encurtador'));
-    };
-
-    script.src = `https://is.gd/forward.php?format=json&callback=${callbackName}&shorturl=${codigo}`;
-    document.body.appendChild(script);
-  });
-}
-
-function resolverLinkCurto(urlOuTexto) {
-  return comTimeout(resolverLinkCurtoBruto(urlOuTexto), 6000, 'Tempo esgotado ao resolver o link curto');
-}
-
+// Link de visualização: quem abre vê o resultado (somente leitura).
 async function copiarLinkCompartilhamento() {
-  let urlLonga;
   try {
-    urlLonga = gerarLinkCompartilhamento();
+    const id = await garantirResultadoSalvo();
+    const url = `${location.origin}${location.pathname}#ver=${id}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      return { ok: true, url };
+    } catch (e) {
+      return { ok: false, url };
+    }
   } catch (e) {
-    console.error('Erro ao montar o link:', e);
-    return { ok: false, url: null, encurtado: false, erro: 'Não consegui montar o link. Veja o console pra detalhes.' };
-  }
-
-  let urlFinal = urlLonga;
-  let encurtado = true;
-
-  try {
-    urlFinal = await encurtarLink(urlLonga);
-  } catch (e) {
-    console.warn('Encurtador indisponível, usando link completo:', e);
-    encurtado = false;
-  }
-
-  try {
-    await navigator.clipboard.writeText(urlFinal);
-    return { ok: true, url: urlFinal, encurtado };
-  } catch (e) {
-    console.warn('Não foi possível copiar automaticamente:', e);
-    return { ok: false, url: urlFinal, encurtado };
+    console.error('Erro ao salvar resultado no Firebase:', e);
+    return { ok: false, url: null, erro: 'Não consegui salvar o resultado. Verifique sua conexão e tente de novo.' };
   }
 }
 
-// Ao abrir o app com #ver=<token> na URL, mostra o perfil compartilhado (somente leitura)
-function verificarLinkCompartilhado() {
+// Link de comparação: quem abre responde o PRÓPRIO questionário, e ao terminar
+// já vê automaticamente a compatibilidade com quem enviou o link.
+async function copiarLinkComparar() {
+  try {
+    const id = await garantirResultadoSalvo();
+    const url = `${location.origin}${location.pathname}#comparar=${id}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      return { ok: true, url };
+    } catch (e) {
+      return { ok: false, url };
+    }
+  } catch (e) {
+    console.error('Erro ao salvar resultado no Firebase:', e);
+    return { ok: false, url: null, erro: 'Não consegui salvar o resultado. Verifique sua conexão e tente de novo.' };
+  }
+}
+
+// Busca um resultado salvo no Firestore a partir de um ID (ou de um link colado
+// contendo #ver= ou #comparar=).
+async function buscarResultadoPorLinkOuId(valor) {
+  let id = valor.trim();
+  const marcadorVer = '#ver=';
+  const marcadorComparar = '#comparar=';
+
+  if (id.includes(marcadorVer)) {
+    id = id.slice(id.indexOf(marcadorVer) + marcadorVer.length);
+  } else if (id.includes(marcadorComparar)) {
+    id = id.slice(id.indexOf(marcadorComparar) + marcadorComparar.length);
+  }
+
+  if (!id) return null;
+  if (typeof window.dbBuscarResultado !== 'function') {
+    throw new Error('Conexão com o banco de dados não está disponível.');
+  }
+  return await window.dbBuscarResultado(id);
+}
+
+// Ao abrir o app com #ver=<id> na URL, mostra o perfil compartilhado (somente leitura)
+async function verificarLinkCompartilhado() {
   const hash = location.hash;
   if (!hash.startsWith('#ver=')) return false;
 
-  const token = hash.slice(5);
+  const id = hash.slice(5);
   try {
-    const pacote = decodificarPacote(token);
+    const pacote = await window.dbBuscarResultado(id);
+    if (!pacote) throw new Error('Resultado não encontrado');
     renderPerfilCompartilhado(expandirPacote(pacote));
     return true;
   } catch (e) {
     console.error('Link de compartilhamento inválido:', e);
     return false;
   }
+}
+
+// Ao abrir o app com #comparar=<id> na URL, guarda o ID pra comparar
+// automaticamente assim que a pessoa terminar o próprio questionário.
+let compararAlvoId = null;
+
+function verificarLinkComparar() {
+  const hash = location.hash;
+  if (!hash.startsWith('#comparar=')) return false;
+  compararAlvoId = hash.slice(10);
+  return true;
 }
 
 // ---------- PROGRESSO SALVO LOCALMENTE (retomar de onde parou) ----------
