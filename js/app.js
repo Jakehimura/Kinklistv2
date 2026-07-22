@@ -366,6 +366,7 @@ function criarLinha(perguntaId, chave, label, onChange) {
         `).join('')}
         <span class="escala-label right">Adoro</span>
       </div>
+      <div class="escala-espacador" aria-hidden="true"></div>
     </div>
   `;
 
