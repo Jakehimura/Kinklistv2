@@ -316,6 +316,8 @@ body {
 .chip-info-rosa { background: #D4537E; }
 .chip-info-laranja { background: #EF9F27; }
 
+.btn-comparar-questionario { margin-top: 8px; width: 100%; }
+
 .compartilhar-box {
   background: var(--bg); border-radius: 10px; padding: 1rem; text-align: center;
   margin-bottom: 1.5rem;
