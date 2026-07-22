@@ -10,10 +10,50 @@
   <button id="toggle-tema" class="toggle-tema" aria-label="Alternar tema claro/escuro">🌙</button>
   <div class="app" id="app"></div>
 
-  <!-- Bibliotecas para exportação de PDF e compressão do link de compartilhamento -->
+  <!-- Bibliotecas para exportação de PDF -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.5.0/lz-string.min.js"></script>
+
+  <!-- Firebase: guarda os resultados e permite gerar links curtos e comparações.
+       Exposto em window.dbSalvarResultado / window.dbBuscarResultado pra ser
+       usado pelos scripts normais (não-módulo) abaixo. -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
+    import {
+      getFirestore, collection, addDoc, doc, getDoc, serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDu-BW12DTQ9vtfsKBNm5vKxBSEiqxOXc4",
+      authDomain: "kink-list-v2.firebaseapp.com",
+      projectId: "kink-list-v2",
+      storageBucket: "kink-list-v2.firebasestorage.app",
+      messagingSenderId: "586456407264",
+      appId: "1:586456407264:web:8a90bfd46ba59f792c0485"
+    };
+
+    const firebaseApp = initializeApp(firebaseConfig);
+    const db = getFirestore(firebaseApp);
+
+    window.dbSalvarResultado = async function (pacote) {
+      const dados = {
+        v: pacote.v,
+        perfil: pacote.perfil,
+        r: pacote.r,
+        criadoEm: serverTimestamp()
+      };
+      const ref = await addDoc(collection(db, 'resultados'), dados);
+      return ref.id;
+    };
+
+    window.dbBuscarResultado = async function (id) {
+      const ref = doc(db, 'resultados', id);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) return null;
+      const dados = snap.data();
+      return { v: dados.v, perfil: dados.perfil, r: dados.r };
+    };
+  </script>
 
   <script src="js/dataManager.js"></script>
   <script src="js/ruleEngine.js"></script>
