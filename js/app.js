@@ -523,11 +523,20 @@ function renderResultado() {
   document.getElementById('btn-copiar-link').addEventListener('click', async () => {
     const status = document.getElementById('compartilhar-status');
     status.textContent = 'Gerando link...';
-    const resultado = await copiarLinkCompartilhamento();
-    if (resultado.ok) {
-      status.textContent = resultado.encurtado ? 'Link curto copiado!' : 'Link copiado (encurtador indisponível no momento, este é o link completo).';
-    } else {
-      status.textContent = resultado.url;
+    try {
+      const resultado = await copiarLinkCompartilhamento();
+      if (resultado.ok) {
+        status.textContent = resultado.encurtado ? 'Link curto copiado!' : 'Link copiado (encurtador indisponível no momento, este é o link completo).';
+      } else if (resultado.erro) {
+        status.textContent = resultado.erro;
+      } else if (resultado.url) {
+        status.textContent = 'Não copiei automaticamente, mas aqui está o link: ' + resultado.url;
+      } else {
+        status.textContent = 'Não consegui gerar o link. Tenta de novo.';
+      }
+    } catch (e) {
+      console.error('Erro inesperado ao gerar link:', e);
+      status.textContent = 'Algo deu errado ao gerar o link. Veja o console (F12) pra detalhes.';
     }
   });
 
