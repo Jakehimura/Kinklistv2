@@ -214,10 +214,38 @@ function renderCategoria() {
     if (indiceCategoria < categoriasQuestionario.length - 1) {
       indiceCategoria++;
       renderCategoria();
+    } else if (compararAlvoId) {
+      finalizarComComparacao();
     } else {
       renderResultado();
     }
   });
+}
+
+// Chamado ao terminar o questionário quando a pessoa chegou por um link
+// "compartilhar pra comparar" — salva o resultado dela, busca o do remetente,
+// e mostra a comparação direto, sem passos extras.
+async function finalizarComComparacao() {
+  limparProgressoLocal();
+  app.innerHTML = `
+    <div class="card">
+      <h1>Calculando compatibilidade...</h1>
+      <p class="subtitle">Só um instante.</p>
+    </div>
+  `;
+
+  try {
+    const pacoteOutroBruto = await window.dbBuscarResultado(compararAlvoId);
+    if (!pacoteOutroBruto) throw new Error('Resultado de origem não encontrado');
+
+    const pacoteOutro = expandirPacote(pacoteOutroBruto);
+    const meuPerfil = { categorias: categoriasQuestionario, respostas: respostasUsuario };
+    const match = compararPerfis(meuPerfil, pacoteOutro);
+    renderResultadoComparacao(match);
+  } catch (e) {
+    console.error('Erro ao calcular comparação automática:', e);
+    renderResultado();
+  }
 }
 
 function atualizarBotaoAvancar(categoria) {
@@ -495,6 +523,7 @@ function renderResultado() {
       <div class="compartilhar-box">
         <p class="compartilhar-titulo">Compartilhar resultados</p>
         <button class="btn-primary" id="btn-copiar-link">Copiar link de compartilhamento</button>
+        <button class="btn-outline btn-comparar-questionario" id="btn-copiar-link-comparar">Compartilhar questionário para comparar com este</button>
         <p class="compartilhar-status" id="compartilhar-status"></p>
       </div>
 
@@ -523,11 +552,31 @@ function renderResultado() {
 
   document.getElementById('btn-copiar-link').addEventListener('click', async () => {
     const status = document.getElementById('compartilhar-status');
-    status.textContent = 'Gerando link...';
+    status.textContent = 'Salvando e gerando link...';
     try {
       const resultado = await copiarLinkCompartilhamento();
       if (resultado.ok) {
-        status.textContent = resultado.encurtado ? 'Link curto copiado!' : 'Link copiado (encurtador indisponível no momento, este é o link completo).';
+        status.textContent = 'Link copiado!';
+      } else if (resultado.erro) {
+        status.textContent = resultado.erro;
+      } else if (resultado.url) {
+        status.textContent = 'Não copiei automaticamente, mas aqui está o link: ' + resultado.url;
+      } else {
+        status.textContent = 'Não consegui gerar o link. Tenta de novo.';
+      }
+    } catch (e) {
+      console.error('Erro inesperado ao gerar link:', e);
+      status.textContent = 'Algo deu errado ao gerar o link. Veja o console (F12) pra detalhes.';
+    }
+  });
+
+  document.getElementById('btn-copiar-link-comparar').addEventListener('click', async () => {
+    const status = document.getElementById('compartilhar-status');
+    status.textContent = 'Salvando e gerando link...';
+    try {
+      const resultado = await copiarLinkComparar();
+      if (resultado.ok) {
+        status.textContent = 'Link copiado! Quem abrir vai responder o questionário e já ver a compatibilidade com você.';
       } else if (resultado.erro) {
         status.textContent = resultado.erro;
       } else if (resultado.url) {
@@ -578,27 +627,14 @@ function renderTelaComparar() {
     botao.textContent = 'Calculando...';
 
     try {
-      let valorResolvido = valorOriginal;
-      if (!valorResolvido.includes('#ver=')) {
-        valorResolvido = await resolverLinkCurto(valorResolvido);
-      }
+      const pacoteBruto = await buscarResultadoPorLinkOuId(valorOriginal);
 
-      const marcador = '#ver=';
-      const idx = valorResolvido.indexOf(marcador);
-      if (idx === -1) {
-        erro.textContent = 'Isso não parece um link deste app. Confira se copiou o link certo.';
+      if (!pacoteBruto) {
+        erro.textContent = 'Não achei esse resultado. Confira se o link está certo e completo.';
         return;
       }
 
-      const token = valorResolvido.slice(idx + marcador.length);
-
-      let pacoteOutro;
-      try {
-        pacoteOutro = expandirPacote(decodificarPacote(token));
-      } catch (e) {
-        erro.textContent = 'Não consegui ler esse link — ele pode estar incompleto ou cortado ao copiar.';
-        return;
-      }
+      const pacoteOutro = expandirPacote(pacoteBruto);
 
       if (!pacoteOutro.categorias || pacoteOutro.categorias.length === 0) {
         erro.textContent = 'Esse link não tem nenhuma resposta pra comparar.';
@@ -609,7 +645,8 @@ function renderTelaComparar() {
       const match = compararPerfis(meuPerfil, pacoteOutro);
       renderResultadoComparacao(match);
     } catch (e) {
-      erro.textContent = 'Não consegui resolver esse link curto agora. Tente colar o link completo, ou tente de novo em instantes.';
+      console.error('Erro ao buscar resultado para comparação:', e);
+      erro.textContent = 'Não consegui buscar esse resultado agora. Verifique sua conexão e tente de novo.';
     } finally {
       botao.disabled = false;
       botao.textContent = 'Calcular compatibilidade';
@@ -782,8 +819,15 @@ function renderTelaRetomar(salvo) {
 
 // ---------- INICIALIZAÇÃO ----------
 
-dataManager.carregarTudo().then(() => {
-  if (verificarLinkCompartilhado()) return;
+dataManager.carregarTudo().then(async () => {
+  if (verificarLinkComparar()) {
+    // Veio de um link "compartilhar pra comparar": começa o próprio
+    // questionário normalmente; a comparação acontece automaticamente no final.
+    renderPerfilCompleto();
+    return;
+  }
+
+  if (await verificarLinkCompartilhado()) return;
 
   const salvo = carregarProgressoLocal();
   if (salvo) {
