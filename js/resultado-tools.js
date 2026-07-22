@@ -103,9 +103,20 @@ function gerarLinkCompartilhamento() {
   return `${location.origin}${location.pathname}#ver=${token}`;
 }
 
+// Adiciona um limite de tempo a uma Promise: se ela não resolver/rejeitar
+// dentro do prazo, rejeita sozinha. Evita que uma chamada travada (script que
+// nunca carrega nem dá erro, comum com bloqueadores de anúncio) prenda a
+// interface pra sempre.
+function comTimeout(promise, ms, mensagemErro) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(mensagemErro)), ms))
+  ]);
+}
+
 // Encurta a URL usando is.gd (gratuito, sem cadastro, feito pra ser chamado direto
 // do navegador — usamos JSONP pra não depender de CORS).
-function encurtarLink(urlLonga) {
+function encurtarLinkBruto(urlLonga) {
   return new Promise((resolve, reject) => {
     const callbackName = 'isgdCallback_' + Date.now();
     const script = document.createElement('script');
@@ -131,11 +142,15 @@ function encurtarLink(urlLonga) {
   });
 }
 
+function encurtarLink(urlLonga) {
+  return comTimeout(encurtarLinkBruto(urlLonga), 6000, 'Tempo esgotado ao tentar encurtar o link');
+}
+
 // Faz o caminho inverso: dado um link curto (is.gd/xxxxx ou v.gd/xxxxx), resolve
 // pra URL completa original. Necessário porque quem cola um link no comparador
 // normalmente vai colar a versão curta, não a longa com o token dentro.
 // Se o texto passado não parecer um link curto, devolve ele mesmo sem alterar.
-function resolverLinkCurto(urlOuTexto) {
+function resolverLinkCurtoBruto(urlOuTexto) {
   return new Promise((resolve, reject) => {
     const match = urlOuTexto.match(/(?:is\.gd|v\.gd)\/([a-zA-Z0-9]+)/);
     if (!match) { resolve(urlOuTexto); return; }
@@ -165,14 +180,26 @@ function resolverLinkCurto(urlOuTexto) {
   });
 }
 
+function resolverLinkCurto(urlOuTexto) {
+  return comTimeout(resolverLinkCurtoBruto(urlOuTexto), 6000, 'Tempo esgotado ao resolver o link curto');
+}
+
 async function copiarLinkCompartilhamento() {
-  const urlLonga = gerarLinkCompartilhamento();
+  let urlLonga;
+  try {
+    urlLonga = gerarLinkCompartilhamento();
+  } catch (e) {
+    console.error('Erro ao montar o link:', e);
+    return { ok: false, url: null, encurtado: false, erro: 'Não consegui montar o link. Veja o console pra detalhes.' };
+  }
+
   let urlFinal = urlLonga;
   let encurtado = true;
 
   try {
     urlFinal = await encurtarLink(urlLonga);
   } catch (e) {
+    console.warn('Encurtador indisponível, usando link completo:', e);
     encurtado = false;
   }
 
@@ -180,6 +207,7 @@ async function copiarLinkCompartilhamento() {
     await navigator.clipboard.writeText(urlFinal);
     return { ok: true, url: urlFinal, encurtado };
   } catch (e) {
+    console.warn('Não foi possível copiar automaticamente:', e);
     return { ok: false, url: urlFinal, encurtado };
   }
 }
