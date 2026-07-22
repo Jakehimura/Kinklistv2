@@ -176,7 +176,8 @@ body {
 }
 .check-nunca input { width: 14px; height: 14px; cursor: pointer; }
 
-.escala-row { display: flex; align-items: center; gap: 8px; }
+.escala-row { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.escala-espacador { width: 65px; flex-shrink: 0; }
 
 .limite-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 64px; }
 
