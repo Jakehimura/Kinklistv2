@@ -1,0 +1,54 @@
+{
+  "quemVoceE": {
+    "titulo": "Quem é você?",
+    "campos": [
+      {
+        "id": "posicao",
+        "label": "Posição que se identifica",
+        "opcoes": ["Top", "Switch", "Bottom", "Sádico", "Masoquista", "Fetichista", "Outros"]
+      },
+      {
+        "id": "anatomia",
+        "label": "Anatomia",
+        "opcoes": ["Prefiro não responder", "Pênis", "Vagina"]
+      },
+      {
+        "id": "dor",
+        "label": "Tolerância à dor",
+        "opcoes": ["Muito Baixa", "Baixa", "Média", "Alta", "Muito Alta", "N/A"]
+      },
+      {
+        "id": "teorica",
+        "label": "Nível de experiência teórica",
+        "opcoes": ["0-3 anos", "3-5 anos", "5-7 anos", "7-10 anos", "10+ anos"]
+      },
+      {
+        "id": "pratica",
+        "label": "Nível de experiência prática",
+        "opcoes": ["0-3 anos", "3-5 anos", "5-7 anos", "7-10 anos", "10+ anos"]
+      }
+    ]
+  },
+
+  "tipoRelacionamento": {
+    "titulo": "Tipo de Relacionamento",
+    "subtitulo": "Selecione todas as que se aplicam.",
+    "multiplo": true,
+    "opcoes": [
+      "Sessões Avulsas", "Monogamia", "Não-monogamia", "Cuckolding",
+      "Múltiplos parceiros", "Swing (troca de casais)", "Poliamor",
+      "Troca de poder (TPE)", "Troca Erótica de Poder (EPE)",
+      "Troca Parcial de Poder (PPE)", "Disponibilidade 24/7"
+    ]
+  },
+
+  "locais": {
+    "titulo": "Locais",
+    "subtitulo": "Selecione todos os que se aplicam.",
+    "multiplo": true,
+    "opcoes": ["Privado", "Público (exibição controlada)", "Clubes/Meetings"]
+  },
+
+  "_comentario_regras": "Filtro condicional (ex: remover categorias com base no tipo de relacionamento) fica pra depois, ainda em avaliação. O motor (ruleEngine.js) já existe e funciona, só não tem regra ativa aqui.",
+  "regrasCondicionais": []
+}
