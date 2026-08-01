@@ -163,6 +163,14 @@ async function verificarLinkCompartilhado() {
   if (!hash.startsWith('#ver=')) return false;
 
   const id = hash.slice(5);
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="card">
+      <h1>Carregando resultado...</h1>
+      <p class="subtitle">Só um instante.</p>
+    </div>
+  `;
+
   try {
     const pacote = await window.dbBuscarResultado(id);
     if (!pacote) throw new Error('Resultado não encontrado');
@@ -170,7 +178,13 @@ async function verificarLinkCompartilhado() {
     return true;
   } catch (e) {
     console.error('Link de compartilhamento inválido:', e);
-    return false;
+    app.innerHTML = `
+      <div class="card">
+        <h1>Não encontramos esse resultado</h1>
+        <p class="subtitle">O link pode estar incorreto ou o resultado pode não existir mais.</p>
+      </div>
+    `;
+    return true;
   }
 }
 
