@@ -1,5 +1,20 @@
 const app = document.getElementById('app');
 
+// TODO: trocar pelo link real da comunidade quando disponível.
+const REDDIT_URL = 'https://www.reddit.com/r/brasilbdsm/';
+
+// Troca o conteúdo de um botão por um spinner + texto de carregamento, e devolve
+// uma função pra restaurar o estado original (chamar sempre no finally).
+function iniciarSpinnerBotao(botao, textoCarregando) {
+  const textoOriginal = botao.innerHTML;
+  botao.disabled = true;
+  botao.innerHTML = `<span class="spinner"></span>${textoCarregando}`;
+  return () => {
+    botao.disabled = false;
+    botao.innerHTML = textoOriginal;
+  };
+}
+
 // ---------- TEMA (claro/escuro) ----------
 
 function temaInicial() {
@@ -27,7 +42,7 @@ function aplicarTema(tema) {
 })();
 
 const ESCALA_CORES = ['#BA7517', '#EF9F27', '#FAC775', '#C9C9D2', '#97C459', '#639922', '#3B6D11'];
-const ESCALA_TAMANHOS = [26, 22, 18, 14, 18, 22, 26];
+const ESCALA_TAMANHOS = [32, 29, 27, 25, 27, 29, 32];
 
 let categoriasDisponiveis = [];   // categorias após o ruleEngine (hoje = todas)
 let categoriasSelecionadas = [];  // ids escolhidos pelo usuário na tela de seleção
@@ -112,12 +127,13 @@ function renderPerfilCompleto() {
       <p class="subtitle">Selecione os tópicos que você quer responder.</p>
       <div class="chips-grupo chips-categorias">
         ${categoriasDisponiveis.map(cat => `
-          <button class="chip ${categoriasSelecionadas.includes(cat.id) ? 'selected' : ''}" data-grupo="categorias" data-valor="${cat.id}">${cat.nome}</button>
+          <button class="chip ${categoriasSelecionadas.includes(cat.id) ? 'selected' : ''}" data-grupo="categorias" data-valor="${cat.id}">${cat.nome} <span class="chip-contagem">(${(dataManager.perguntas[cat.id] || []).length})</span></button>
         `).join('')}
       </div>
     </div>
 
     <button class="btn-primary btn-iniciar-full" id="btn-iniciar" ${categoriasSelecionadas.length === 0 ? 'disabled' : ''}>🚀 Iniciar Questionário</button>
+    <p class="faltam-texto" id="faltam-texto-perfil">${categoriasSelecionadas.length === 0 ? 'Selecione pelo menos 1 tópico em Subcategorias' : ''}</p>
   `;
 
   app.querySelectorAll('select[data-campo]').forEach(sel => {
@@ -129,6 +145,7 @@ function renderPerfilCompleto() {
   });
 
   const btnIniciar = document.getElementById('btn-iniciar');
+  const dicaIniciar = document.getElementById('faltam-texto-perfil');
 
   app.querySelectorAll('.chip[data-grupo]').forEach(chip => {
     chip.addEventListener('click', () => {
@@ -140,7 +157,10 @@ function renderPerfilCompleto() {
       if (idx === -1) lista.push(valor); else lista.splice(idx, 1);
       chip.classList.toggle('selected');
 
-      if (grupo === 'categorias') btnIniciar.disabled = categoriasSelecionadas.length === 0;
+      if (grupo === 'categorias') {
+        btnIniciar.disabled = categoriasSelecionadas.length === 0;
+        dicaIniciar.textContent = categoriasSelecionadas.length === 0 ? 'Selecione pelo menos 1 tópico em Subcategorias' : '';
+      }
       salvarProgressoLocal('perfil');
     });
   });
@@ -169,6 +189,23 @@ function iniciarQuestionario() {
   indiceCategoria = 0;
   renderCategoria();
   salvarProgressoLocal('questionario');
+  mostrarModalIntro();
+}
+
+function mostrarModalIntro() {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal-card">
+      <h2>Como funciona</h2>
+      <p>Responda as perguntas de cada tópico que você escolheu. Seu resultado só aparece no final, depois de concluir todos os tópicos.</p>
+      <p>O botão de avançar só libera quando todas as perguntas da tela estiverem respondidas — se ficar cinza, veja qual pergunta está marcada em laranja.</p>
+      <p>Se sair no meio, pode voltar depois — o app lembra de onde você parou.</p>
+      <button class="btn-primary" id="btn-modal-ok">Entendi</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  document.getElementById('btn-modal-ok').addEventListener('click', () => overlay.remove());
 }
 
 // ---------- TELA DE CATEGORIA (todas as perguntas daquele tópico juntas) ----------
@@ -187,17 +224,24 @@ function renderCategoria() {
 
       <div id="perguntas-categoria"></div>
 
-      <div class="nav-rodape">
-        <button class="btn-secundario" id="btn-voltar">Voltar</button>
-        <button class="btn-primary" id="btn-proximo" disabled>
-          ${indiceCategoria === categoriasQuestionario.length - 1 ? 'Ver resultado' : 'Próximo tópico'}
-        </button>
+      <div class="nav-rodape nav-rodape-coluna">
+        <div class="nav-rodape-botoes">
+          <button class="btn-secundario" id="btn-voltar">Voltar</button>
+          <button class="btn-primary" id="btn-proximo" disabled>
+            ${indiceCategoria === categoriasQuestionario.length - 1 ? 'Ver resultado' : 'Próximo tópico'}
+          </button>
+        </div>
+        <p class="faltam-texto" id="faltam-texto"></p>
       </div>
     </div>
   `;
 
   const container = document.getElementById('perguntas-categoria');
-  categoria.perguntas.forEach(p => container.appendChild(criarBlocoPergunta(p.id, p.texto)));
+  categoria.perguntas.forEach(p => {
+    const bloco = criarBlocoPergunta(p.id, p.texto);
+    bloco.dataset.perguntaId = p.id;
+    container.appendChild(bloco);
+  });
 
   atualizarBotaoAvancar(categoria);
 
@@ -250,7 +294,22 @@ async function finalizarComComparacao() {
 
 function atualizarBotaoAvancar(categoria) {
   const btn = document.getElementById('btn-proximo');
-  if (btn) btn.disabled = !categoriaCompleta(categoria);
+  const pendentes = categoria.perguntas.filter(p => !perguntaRespondida(p.id));
+
+  if (btn) btn.disabled = pendentes.length > 0;
+
+  categoria.perguntas.forEach(p => {
+    const bloco = document.querySelector(`[data-pergunta-id="${CSS.escape(p.id)}"]`);
+    if (bloco) bloco.classList.toggle('pergunta-incompleta', !perguntaRespondida(p.id));
+  });
+
+  const faltamTexto = document.getElementById('faltam-texto');
+  if (faltamTexto) {
+    faltamTexto.textContent = pendentes.length > 0
+      ? `Faltam ${pendentes.length} pergunta${pendentes.length > 1 ? 's' : ''} pra avançar`
+      : '';
+  }
+
   salvarProgressoLocal('questionario');
 }
 
@@ -378,12 +437,11 @@ function criarLinha(perguntaId, chave, label, onChange) {
         <span>Nunca experimentei</span>
       </label>
     </div>
+    <div class="limite-row">
+      <button class="limite-btn ${rs.limite ? 'on' : 'off'}" aria-label="Limite rígido"></button>
+      <span class="limite-text">Limite rígido</span>
+    </div>
     <div class="escala-row">
-      <div class="limite-wrap">
-        <button class="limite-btn ${rs.limite ? 'on' : 'off'}" aria-label="Limite rígido"></button>
-        <span class="limite-text">Limite rígido</span>
-      </div>
-      <div class="divisor"></div>
       <div class="escala-grupo ${(rs.limite || rs.nunca) ? 'disabled' : ''}">
         <span class="escala-label left">Limite</span>
         ${ESCALA_TAMANHOS.map((s, i) => `
@@ -394,7 +452,6 @@ function criarLinha(perguntaId, chave, label, onChange) {
         `).join('')}
         <span class="escala-label right">Adoro</span>
       </div>
-      <div class="escala-espacador" aria-hidden="true"></div>
     </div>
   `;
 
@@ -547,12 +604,18 @@ function renderResultado() {
           </div>
         `).join('')}
       </div>
+
+      <div class="link-comunidade">
+        <a href="${REDDIT_URL}" target="_blank" rel="noopener noreferrer">📱 Conheça nossa comunidade no Reddit</a>
+      </div>
     </div>
   `;
 
   document.getElementById('btn-copiar-link').addEventListener('click', async () => {
+    const botao = document.getElementById('btn-copiar-link');
     const status = document.getElementById('compartilhar-status');
-    status.textContent = 'Salvando e gerando link...';
+    const restaurar = iniciarSpinnerBotao(botao, 'Salvando...');
+    status.textContent = '';
     try {
       const resultado = await copiarLinkCompartilhamento();
       if (resultado.ok) {
@@ -567,12 +630,16 @@ function renderResultado() {
     } catch (e) {
       console.error('Erro inesperado ao gerar link:', e);
       status.textContent = 'Algo deu errado ao gerar o link. Veja o console (F12) pra detalhes.';
+    } finally {
+      restaurar();
     }
   });
 
   document.getElementById('btn-copiar-link-comparar').addEventListener('click', async () => {
+    const botao = document.getElementById('btn-copiar-link-comparar');
     const status = document.getElementById('compartilhar-status');
-    status.textContent = 'Salvando e gerando link...';
+    const restaurar = iniciarSpinnerBotao(botao, 'Salvando...');
+    status.textContent = '';
     try {
       const resultado = await copiarLinkComparar();
       if (resultado.ok) {
@@ -587,10 +654,20 @@ function renderResultado() {
     } catch (e) {
       console.error('Erro inesperado ao gerar link:', e);
       status.textContent = 'Algo deu errado ao gerar o link. Veja o console (F12) pra detalhes.';
+    } finally {
+      restaurar();
     }
   });
 
-  document.getElementById('btn-exportar-pdf').addEventListener('click', exportarResultadoPDF);
+  document.getElementById('btn-exportar-pdf').addEventListener('click', async () => {
+    const botao = document.getElementById('btn-exportar-pdf');
+    const restaurar = iniciarSpinnerBotao(botao, 'Gerando PDF...');
+    try {
+      await exportarResultadoPDF();
+    } finally {
+      restaurar();
+    }
+  });
   document.getElementById('btn-comparar').addEventListener('click', renderTelaComparar);
 }
 
@@ -623,8 +700,7 @@ function renderTelaComparar() {
     }
 
     erro.textContent = '';
-    botao.disabled = true;
-    botao.textContent = 'Calculando...';
+    const restaurar = iniciarSpinnerBotao(botao, 'Calculando...');
 
     try {
       const pacoteBruto = await buscarResultadoPorLinkOuId(valorOriginal);
@@ -648,8 +724,7 @@ function renderTelaComparar() {
       console.error('Erro ao buscar resultado para comparação:', e);
       erro.textContent = 'Não consegui buscar esse resultado agora. Verifique sua conexão e tente de novo.';
     } finally {
-      botao.disabled = false;
-      botao.textContent = 'Calcular compatibilidade';
+      restaurar();
     }
   });
 }
