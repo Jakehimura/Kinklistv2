@@ -40,6 +40,7 @@ body { transition: background 0.2s ease, color 0.2s ease; }
 .modal-card h2 { font-size: 17px; margin-bottom: 12px; }
 .modal-card p { font-size: 14px; color: var(--text-secondary); margin-bottom: 10px; line-height: 1.5; }
 .modal-card .btn-primary { margin-top: 10px; width: 100%; }
+.modal-credito { font-size: 10px; color: var(--text-secondary); opacity: 0.6; margin-top: 14px !important; margin-bottom: 0 !important; }
 
 .link-comunidade { text-align: center; margin-top: 1rem; }
 .link-comunidade a { color: var(--accent); font-size: 13px; text-decoration: none; font-weight: 500; }
@@ -73,7 +74,9 @@ body {
 
   min-height: 100vh;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
   padding: 2rem 1rem calc(1rem + 20px);
 }
 
@@ -202,6 +205,14 @@ body {
 
 .escala-row { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 10px; }
 
+.quero-experimentar {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  margin-top: 10px; padding-top: 10px; border-top: 0.5px dashed var(--border);
+}
+.quero-label { font-size: 13px; color: var(--text-secondary); }
+.quero-switch-linha { display: flex; align-items: center; gap: 8px; }
+.quero-switch-texto { font-size: 12px; color: var(--text-secondary); }
+
 .limite-row {
   display: flex; align-items: center; justify-content: center; gap: 8px;
   margin-top: 8px; padding-top: 8px; border-top: 0.5px dashed var(--border);
@@ -292,6 +303,20 @@ body {
 .pergunta-bloco:last-child { border-bottom: none; }
 .pergunta-bloco .pergunta-titulo { text-align: center; }
 .pergunta-bloco .modo-switches { margin-bottom: 1.25rem; }
+
+.pergunta-titulo-linha {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.pergunta-titulo-linha .pergunta-titulo { margin-bottom: 0; }
+.info-btn {
+  background: transparent; border: none; cursor: pointer;
+  color: var(--accent); font-size: 15px; padding: 0; line-height: 1;
+}
+.pergunta-explicacao {
+  font-size: 12px; color: var(--text-secondary); text-align: center;
+  margin-top: 6px; margin-bottom: 1.25rem; line-height: 1.4;
+  background: var(--bg); border-radius: 8px; padding: 8px 12px;
+}
 
 .resultado-header {
   display: flex; align-items: center; justify-content: space-between;
@@ -416,6 +441,8 @@ body {
   margin-top: 1.75rem;
 }
 .btn-secundario {
-  background: transparent; border: none; color: var(--text-secondary);
-  font-size: 14px; cursor: pointer;
+  background: transparent; border: 0.5px solid var(--border-strong); border-radius: 10px;
+  color: var(--text); font-size: 14px; font-weight: 500; cursor: pointer;
+  padding: 12px 20px;
 }
+.btn-secundario:hover { border-color: var(--text-secondary); }
