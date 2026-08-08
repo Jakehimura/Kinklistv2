@@ -1,7 +1,7 @@
 const app = document.getElementById('app');
 
 // TODO: trocar pelo link real da comunidade quando disponível.
-const REDDIT_URL = 'https://www.reddit.com/r/brasilbdsm/';
+const REDDIT_URL = 'https://reddit.com/';
 
 // Troca o conteúdo de um botão por um spinner + texto de carregamento, e devolve
 // uma função pra restaurar o estado original (chamar sempre no finally).
@@ -53,7 +53,7 @@ let respostasPerfil = { quemVoceE: {}, tipoRelacionamento: [], locais: [] };
 let respostasUsuario = {};
 
 function estadoLinhaVazio() {
-  return { limite: false, nunca: false, valor: null };
+  return { limite: false, nunca: false, valor: null, quero: null };
 }
 function estadoPerguntaVazio() {
   return { modo: 'ambos', fazer: estadoLinhaVazio(), receber: estadoLinhaVazio() };
@@ -202,6 +202,7 @@ function mostrarModalIntro() {
       <p>O botão de avançar só libera quando todas as perguntas da tela estiverem respondidas — se ficar cinza, veja qual pergunta está marcada em laranja.</p>
       <p>Se sair no meio, pode voltar depois — o app lembra de onde você parou.</p>
       <button class="btn-primary" id="btn-modal-ok">Entendi</button>
+      <p class="modal-credito">Desenvolvido por Jakehimura, baseado na Kinklist por Herr Krieg</p>
     </div>
   `;
   document.body.appendChild(overlay);
@@ -351,17 +352,37 @@ function criarBlocoPergunta(perguntaId, texto) {
   const estado = respostasUsuario[perguntaId];
   const categoriaId = perguntaId.split('#')[0];
   const receberBloqueado = receberEstaBloqueado(categoriaId, texto);
+  const explicacao = dataManager.obterExplicacao(categoriaId, texto);
 
   const bloco = document.createElement('div');
   bloco.className = 'pergunta-bloco';
+
+  const tituloHtml = `
+    <div class="pergunta-titulo-linha">
+      <p class="pergunta-titulo">${texto}</p>
+      ${explicacao ? `<button class="info-btn" aria-label="O que é isso?" type="button">ⓘ</button>` : ''}
+    </div>
+    ${explicacao ? `<p class="pergunta-explicacao" hidden>${explicacao}</p>` : ''}
+  `;
+
+  function ativarInfoBtn() {
+    const infoBtn = bloco.querySelector('.info-btn');
+    if (infoBtn) {
+      infoBtn.addEventListener('click', () => {
+        const exp = bloco.querySelector('.pergunta-explicacao');
+        exp.hidden = !exp.hidden;
+      });
+    }
+  }
 
   if (receberBloqueado) {
     if (estado.modo === 'receber' || estado.modo === 'ambos') estado.modo = 'fazer';
 
     bloco.innerHTML = `
-      <p class="pergunta-titulo">${texto}</p>
+      ${tituloHtml}
       <div class="linhas-resposta"></div>
     `;
+    ativarInfoBtn();
 
     function renderLinhaUnica() {
       const container = bloco.querySelector('.linhas-resposta');
@@ -375,7 +396,7 @@ function criarBlocoPergunta(perguntaId, texto) {
   }
 
   bloco.innerHTML = `
-    <p class="pergunta-titulo">${texto}</p>
+    ${tituloHtml}
     <div class="modo-switches">
       <div class="sw-item" data-modo="fazer">
         <span class="switch"><span class="thumb"></span></span>
@@ -392,6 +413,7 @@ function criarBlocoPergunta(perguntaId, texto) {
     </div>
     <div class="linhas-resposta"></div>
   `;
+  ativarInfoBtn();
 
   function atualizarSwitchesBloco() {
     bloco.querySelectorAll('.sw-item').forEach(item => {
@@ -441,18 +463,29 @@ function criarLinha(perguntaId, chave, label, onChange) {
       <button class="limite-btn ${rs.limite ? 'on' : 'off'}" aria-label="Limite rígido"></button>
       <span class="limite-text">Limite rígido</span>
     </div>
-    <div class="escala-row">
-      <div class="escala-grupo ${(rs.limite || rs.nunca) ? 'disabled' : ''}">
-        <span class="escala-label left">Limite</span>
-        ${ESCALA_TAMANHOS.map((s, i) => `
-          <button class="escala-circulo ${rs.valor === i ? 'selected' : ''}"
-                  data-idx="${i}"
-                  style="width:${s}px; height:${s}px; border-color:${ESCALA_CORES[i]}; ${rs.valor === i ? `background:${ESCALA_CORES[i]};` : ''}"
-                  aria-label="opcao ${i + 1}"></button>
-        `).join('')}
-        <span class="escala-label right">Adoro</span>
+    ${rs.nunca ? `
+      <div class="quero-experimentar">
+        <span class="quero-label">Quero experimentar?</span>
+        <div class="quero-switch-linha">
+          <span class="quero-switch-texto">Não</span>
+          <span class="switch quero-switch ${rs.quero === true ? 'on' : ''}"><span class="thumb"></span></span>
+          <span class="quero-switch-texto">Sim</span>
+        </div>
       </div>
-    </div>
+    ` : `
+      <div class="escala-row">
+        <div class="escala-grupo ${rs.limite ? 'disabled' : ''}">
+          <span class="escala-label left">Limite</span>
+          ${ESCALA_TAMANHOS.map((s, i) => `
+            <button class="escala-circulo ${rs.valor === i ? 'selected' : ''}"
+                    data-idx="${i}"
+                    style="width:${s}px; height:${s}px; border-color:${ESCALA_CORES[i]}; ${rs.valor === i ? `background:${ESCALA_CORES[i]};` : ''}"
+                    aria-label="opcao ${i + 1}"></button>
+          `).join('')}
+          <span class="escala-label right">Adoro</span>
+        </div>
+      </div>
+    `}
   `;
 
   wrap.querySelector('.limite-btn').addEventListener('click', () => {
@@ -463,8 +496,16 @@ function criarLinha(perguntaId, chave, label, onChange) {
   wrap.querySelector('.check-nunca input').addEventListener('click', (e) => {
     rs.nunca = e.target.checked;
     if (rs.nunca) rs.limite = false;
+    else rs.quero = null;
     onChange();
   });
+  const queroSwitch = wrap.querySelector('.quero-switch');
+  if (queroSwitch) {
+    queroSwitch.addEventListener('click', () => {
+      rs.quero = !rs.quero;
+      onChange();
+    });
+  }
   wrap.querySelectorAll('.escala-circulo').forEach(btn => {
     btn.addEventListener('click', () => {
       rs.valor = Number(btn.dataset.idx);
