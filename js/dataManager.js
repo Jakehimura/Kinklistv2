@@ -3,6 +3,7 @@ class DataManager {
     this.categorias = [];
     this.perguntas = {};
     this.perfil = { perguntasPerfil: [], regrasCondicionais: [] };
+    this.explicacoes = {};
   }
 
   async carregarTudo() {
@@ -20,7 +21,20 @@ class DataManager {
     this.perguntas = perJson.perguntas;
     this.perfil = perfilJson;
 
+    try {
+      const expRes = await fetch('data/explicacoes.json');
+      const expJson = await expRes.json();
+      this.explicacoes = expJson.explicacoes || {};
+    } catch (e) {
+      console.warn('Não foi possível carregar explicações (não é crítico):', e);
+      this.explicacoes = {};
+    }
+
     return this;
+  }
+
+  obterExplicacao(categoriaId, texto) {
+    return this.explicacoes[categoriaId + '::' + texto] || null;
   }
 }
 
