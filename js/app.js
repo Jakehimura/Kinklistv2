@@ -1,7 +1,7 @@
 const app = document.getElementById('app');
 
 // TODO: trocar pelo link real da comunidade quando disponível.
-const REDDIT_URL = 'https://reddit.com/';
+const REDDIT_URL = 'https://reddit.com/r/brasilbdsm/';
 
 // Troca o conteúdo de um botão por um spinner + texto de carregamento, e devolve
 // uma função pra restaurar o estado original (chamar sempre no finally).
