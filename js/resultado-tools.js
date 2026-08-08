@@ -25,16 +25,18 @@
 
 function codificarEstadoLinha(rs) {
   if (rs.limite) return 'L';
-  if (rs.nunca) return 'N';
+  if (rs.nunca) return 'N' + (rs.quero === true ? '1' : rs.quero === false ? '0' : '');
   if (rs.valor !== null) return String(rs.valor);
   return null;
 }
 
 function decodificarEstadoLinha(cod) {
-  if (cod === undefined || cod === null) return { limite: false, nunca: false, valor: null };
-  if (cod === 'L') return { limite: true, nunca: false, valor: null };
-  if (cod === 'N') return { limite: false, nunca: true, valor: null };
-  return { limite: false, nunca: false, valor: Number(cod) };
+  if (cod === undefined || cod === null) return { limite: false, nunca: false, valor: null, quero: null };
+  if (cod === 'L') return { limite: true, nunca: false, valor: null, quero: null };
+  if (cod === 'N1') return { limite: false, nunca: true, valor: null, quero: true };
+  if (cod === 'N0') return { limite: false, nunca: true, valor: null, quero: false };
+  if (cod === 'N') return { limite: false, nunca: true, valor: null, quero: null };
+  return { limite: false, nunca: false, valor: Number(cod), quero: null };
 }
 
 function montarPacoteResultado() {
